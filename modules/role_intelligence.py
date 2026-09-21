@@ -43,12 +43,11 @@ def get_database_engine():
         )
 
     db_url = URL.create(
-        drivername="postgresql+psycopg2",
-        username="postgres",
+        username=os.environ.get("POSTGRES_USER", "postgres"),
         password=password,
         host=os.environ.get("POSTGRES_HOST", "localhost"),
-        port=5432,
-        database="recruitment_db",
+        port=int(os.environ.get("POSTGRES_PORT", "5432")),
+        database=os.environ.get("POSTGRES_DB", "recruitment_db"),
     )
 
     return create_engine(
