@@ -1,0 +1,12 @@
+feature,importance
+salary_midpoint,0.23866183
+company_name_length,0.16984886
+skill_count,0.15898569
+is_remote,0.15762833
+minimum_experience,0.0878253
+experience_midpoint,0.04322033
+experience_range,0.040159132
+maximum_experience,0.03974623
+title_length,0.03322942
+salary_range,0.030694908
+experience_missing,0.0
