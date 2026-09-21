@@ -6,7 +6,9 @@ from modules.recruitment_intelligence import show_recruitment_intelligence
 
 from modules.role_intelligence import show_role_intelligence
 from modules.admin_home import show_admin_home
+from dotenv import load_dotenv
 
+load_dotenv()
 
 
 st.set_page_config(
