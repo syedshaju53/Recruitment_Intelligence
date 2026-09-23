@@ -3,7 +3,7 @@ import random
 import hashlib
 import smtplib
 import os
-import requests
+
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 
@@ -27,15 +27,28 @@ def hash_otp(otp: str):
 
 
 def send_otp_email(email, otp, purpose):
-    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
+    smtp_host = os.getenv("SMTP_HOST", "smtp.gmail.com").strip()
+    smtp_port = int(os.getenv("SMTP_PORT", "587"))
+    smtp_username = os.getenv("SMTP_USERNAME", "").strip()
+    smtp_password = os.getenv("SMTP_PASSWORD", "").strip()
     sender_email = os.getenv(
-        "RESEND_FROM_EMAIL",
-        "onboarding@resend.dev"
+        "SMTP_FROM_EMAIL",
+        smtp_username
     ).strip()
 
-    if not resend_api_key:
+    if not smtp_username:
         raise RuntimeError(
-            "RESEND_API_KEY is not configured."
+            "SMTP_USERNAME is not configured."
+        )
+
+    if not smtp_password:
+        raise RuntimeError(
+            "SMTP_PASSWORD is not configured."
+        )
+
+    if not sender_email:
+        raise RuntimeError(
+            "SMTP_FROM_EMAIL is not configured."
         )
 
     purpose_text = {
@@ -74,37 +87,54 @@ def send_otp_email(email, otp, purpose):
     </html>
     """
 
-    payload = {
-        "from": sender_email,
-        "to": [email],
-        "subject": subject,
-        "html": html_content,
-    }
+    message = EmailMessage()
+    message["Subject"] = subject
+    message["From"] = sender_email
+    message["To"] = email
 
-    headers = {
-        "Authorization": f"Bearer {resend_api_key}",
-        "Content-Type": "application/json",
-    }
+    message.set_content(
+        f"""
+Recruitment Intelligence
 
-    response = requests.post(
-        "https://api.resend.com/emails",
-        headers=headers,
-        json=payload,
-        timeout=15,
+Your verification code is: {otp}
+
+This OTP is valid for {OTP_EXPIRY_MINUTES} minutes.
+
+If you did not request this code, you can safely ignore this email.
+
+Recruitment Intelligence Portal
+        """.strip()
     )
 
-    if not response.ok:
-        try:
-            error_data = response.json()
-        except Exception:
-            error_data = response.text
+    message.add_alternative(
+        html_content,
+        subtype="html"
+    )
 
+    try:
+        with smtplib.SMTP(
+            smtp_host,
+            smtp_port,
+            timeout=20
+        ) as server:
+            server.ehlo()
+            server.starttls()
+            server.ehlo()
+            server.login(
+                smtp_username,
+                smtp_password
+            )
+            server.send_message(message)
+
+    except Exception as e:
         raise RuntimeError(
-            f"Resend email API failed "
-            f"(HTTP {response.status_code}): {error_data}"
+            f"SMTP email delivery failed: {e}"
         )
 
-    return response.json()
+    return {
+        "status": "sent",
+        "recipient": email
+    }
 
 def create_and_send_otp(
     db: Session,
