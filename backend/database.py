@@ -57,6 +57,17 @@ def get_database_url():
     if not database_url:
         raise ValueError("DATABASE_URL is not configured")
 
+        try:
+            st.sidebar.caption(
+                "DB secrets: "
+                f"host={'YES' if st.secrets.get('POSTGRES_HOST') else 'NO'}, "
+                f"db={'YES' if st.secrets.get('POSTGRES_DB') else 'NO'}, "
+                f"user={'YES' if st.secrets.get('POSTGRES_USER') else 'NO'}, "
+                f"password={'YES' if st.secrets.get('POSTGRES_PASSWORD') else 'NO'}"
+            )
+        except Exception:
+          pass
+
 
     return database_url
 

@@ -1,8 +1,9 @@
-import os
+
 import random
 import hashlib
 import smtplib
-
+import os
+import requests
 from datetime import datetime, timedelta
 from email.message import EmailMessage
 
@@ -25,88 +26,85 @@ def hash_otp(otp: str):
     ).hexdigest()
 
 
-def send_otp_email(
-    email: str,
-    otp: str,
-    purpose: str
-):
-    smtp_host = os.getenv(
-        "SMTP_HOST",
-        "smtp.gmail.com"
-    )
-
-    smtp_port = int(
-        os.getenv(
-            "SMTP_PORT",
-            "587"
-        )
-    )
-
-    smtp_username = os.getenv(
-        "SMTP_USERNAME"
-    )
-
-    smtp_password = os.getenv(
-        "SMTP_PASSWORD"
-    )
-
+def send_otp_email(email, otp, purpose):
+    resend_api_key = os.getenv("RESEND_API_KEY")
     sender_email = os.getenv(
-        "SMTP_FROM_EMAIL",
-        smtp_username
+        "RESEND_FROM_EMAIL",
+        "onboarding@resend.dev"
     )
 
-    if not smtp_username or not smtp_password:
+    if not resend_api_key:
         raise RuntimeError(
-            "SMTP credentials are not configured. "
-            "Set SMTP_USERNAME and SMTP_PASSWORD in .env"
+            "RESEND_API_KEY is not configured."
         )
 
-    otp_label = (
-        "account registration"
-        if purpose == "REGISTER"
-        else "password reset"
+    purpose_text = {
+        "REGISTER": "Registration Verification",
+        "FORGOT_PASSWORD": "Password Reset Verification",
+        "ADMIN_FORGOT_PASSWORD": "Admin Password Reset Verification",
+    }.get(purpose, "Verification Code")
+
+    subject = f"{purpose_text} - Recruitment Intelligence"
+
+    html_content = f"""
+    <html>
+        <body style="font-family: Arial, sans-serif;">
+            <h2>Recruitment Intelligence</h2>
+
+            <p>Your verification code is:</p>
+
+            <h1 style="letter-spacing: 6px;">{otp}</h1>
+
+            <p>
+                This OTP is valid for
+                <strong>{OTP_EXPIRY_MINUTES} minutes</strong>.
+            </p>
+
+            <p>
+                If you did not request this code, you can safely
+                ignore this email.
+            </p>
+
+            <hr>
+
+            <p style="color: #666;">
+                Recruitment Intelligence Portal
+            </p>
+        </body>
+    </html>
+    """
+
+    payload = {
+        "from": sender_email,
+        "to": [email],
+        "subject": subject,
+        "html": html_content,
+    }
+
+    headers = {
+        "Authorization": f"Bearer {resend_api_key}",
+        "Content-Type": "application/json",
+    }
+
+    response = requests.post(
+        "https://api.resend.com/emails",
+        headers=headers,
+        json=payload,
+        timeout=15,
     )
 
-    message = EmailMessage()
+    if not response.ok:
+        try:
+            error_data = response.json()
+        except Exception:
+            error_data = response.text
 
-    message["Subject"] = (
-        f"Recruitment Intelligence - "
-        f"{otp_label.title()} OTP"
-    )
-
-    message["From"] = sender_email
-    message["To"] = email
-
-    message.set_content(
-    f"""
-Recruitment Intelligence Portal
-
-Your OTP for {otp_label} is:
-
-{otp}
-
-This OTP will expire in {OTP_EXPIRY_MINUTES} minutes.
-
-Do not share this OTP with anyone.
-
-If you did not request this, please ignore this email.
-"""
-)
-
-    with smtplib.SMTP(
-        smtp_host,
-        smtp_port
-    ) as server:
-
-        server.starttls()
-
-        server.login(
-            smtp_username,
-            smtp_password
+        raise RuntimeError(
+            f"Resend email API failed "
+            f"(HTTP {response.status_code}): {error_data}"
         )
 
-        server.send_message(message)
-
+    return response.json()
 
 def create_and_send_otp(
     db: Session,
