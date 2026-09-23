@@ -27,11 +27,11 @@ def hash_otp(otp: str):
 
 
 def send_otp_email(email, otp, purpose):
-    resend_api_key = os.getenv("RESEND_API_KEY")
+    resend_api_key = os.getenv("RESEND_API_KEY", "").strip()
     sender_email = os.getenv(
         "RESEND_FROM_EMAIL",
         "onboarding@resend.dev"
-    )
+    ).strip()
 
     if not resend_api_key:
         raise RuntimeError(
